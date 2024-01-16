@@ -6,6 +6,7 @@ import BuddyList from './BuddyList';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as FileSystem from 'expo-file-system';
 import 'react-native-get-random-values';
+import BuddyDetail from './BuddyDetail';
 
 const directoryPath = FileSystem.documentDirectory + 'bucketbuddydir';
 const filePath = directoryPath + '/buddy_data.json';
@@ -16,6 +17,9 @@ const Index = () => {
     const [birthday, setBirthday] = useState(new Date());
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [buddyData, setBuddyData] = useState(new Map());
+
+    const [selectedBuddy, setSelectedBuddy] = useState(null);
+    const [userDetailVisible, setUserDetailVisible] = useState(false);
 
     const showModal = () => setVisible(true);
 
@@ -53,12 +57,16 @@ const Index = () => {
 
     const handleDeleteUser = async (userId) => {
         // Deleting the user from the map
-        console.log(userId);
         const newBuddyData = new Map(buddyData);
         newBuddyData.delete(userId);
         setBuddyData(newBuddyData);
         await FileSystem.writeAsStringAsync(filePath, JSON.stringify(newBuddyData));
     };
+
+    const toggleUserDetail = (buddy) => {
+        setSelectedBuddy(buddy);
+        setUserDetailVisible(true);
+    }
 
     const deleteFile = async () => {
         await FileSystem.writeAsStringAsync(filePath, JSON.stringify(new Map()));
@@ -110,7 +118,7 @@ const Index = () => {
                     onPress={showModal}
                 />
             </Appbar.Header>
-            <BuddyList buddyData={buddyData} onDeleteUser={handleDeleteUser} />
+            <BuddyList buddyData={buddyData} onDeleteUser={handleDeleteUser} toggleUserDetail={toggleUserDetail} />
             <Portal>
                 <Modal visible={visible} onDismiss={hideModal} contentContainerStyle={styles.modalContainer}>
                     <Text style={styles.modalTitle}>Add Buddy</Text>
@@ -139,6 +147,11 @@ const Index = () => {
                         </Button>
                     </View>
                 </Modal>
+                <BuddyDetail
+                    visible={userDetailVisible}
+                    onClose={() => setUserDetailVisible(false)}
+                    buddy={selectedBuddy}
+                />
             </Portal>
         </View>
     );
@@ -178,7 +191,7 @@ const styles = StyleSheet.create({
         fontSize: 24, // Adjust the font size as needed
         fontWeight: 'bold',
         marginBottom: 10,
-        color: '#5e3a4a'
+        color: '#e67aa7'
     }
 });
 

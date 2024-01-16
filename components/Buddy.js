@@ -1,4 +1,3 @@
-import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Avatar, Button, Card, Text } from 'react-native-paper';
 
@@ -30,8 +29,7 @@ const Buddy = ({ friend, daysSinceLastContact }) => {
             </Card.Content>
             <Card.Actions>
                 {daysSinceLastContact > friend.contactLimit &&
-                    (<Button buttonColor="#a15586" icon="sleep" labelStyle={{ color: 'white' }}>Snooze</Button>
-                    )}
+                    (<Button buttonColor="#a15586" icon="sleep" labelStyle={{ color: 'white' }}>Snooze</Button>)}
                 <Button buttonColor="#e67aa7" icon="check-circle-outline" labelStyle={{ color: 'white' }}>Check-In</Button>
             </Card.Actions>
             <View style={styles.daysSinceContainer}>
@@ -44,9 +42,6 @@ const Buddy = ({ friend, daysSinceLastContact }) => {
 const styles = StyleSheet.create({
     buddyStyle: {
         flex: 1,
-        marginVertical: 10,
-        marginHorizontal: 10,
-        borderRadius: 15,
         backgroundColor: '#d9d3e0'
     },
     cardContainer: {

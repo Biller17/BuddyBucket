@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, BackHandler, TouchableWithoutFeedback } from 'react-native';
 import { SwipeListView } from 'react-native-swipe-list-view';
 import Buddy from './Buddy';
 import { Icon } from 'react-native-paper';
@@ -11,19 +11,17 @@ const daysSince = (date) => {
     return Math.floor(difference / (1000 * 60 * 60 * 24)); // Convert milliseconds to days
 }
 
-const BuddyList = ({ buddyData, onDeleteUser }) => {
+const BuddyList = ({ buddyData, onDeleteUser, toggleUserDetail }) => {
 
     const renderHiddenItem = (data, rowMap) => (
         <View style={styles.rowBack}>
             <TouchableOpacity
                 style={[styles.backRightBtn, styles.backRightBtnRight]}
-                onPress={() => onDeleteUser(data.item.id)}
-            >
-                {/* <Text style={styles.backTextWhite}>Delete</Text> */}
+                onPress={() => onDeleteUser(data.item.id)}>
                 <Icon source="trash-can-outline" color="white" size={25} />
             </TouchableOpacity>
         </View>
-    ); 
+    );
     if (buddyData.size == 0) {
         return (
             <View style={{ justifyContent: 'center', alignItems: 'center', marginVertical: 100 }}>
@@ -37,10 +35,18 @@ const BuddyList = ({ buddyData, onDeleteUser }) => {
             <SwipeListView
                 data={sortedBuddyData}
                 renderItem={(data, rowMap) => (
-                    <Buddy
-                        friend={data.item}
-                        daysSinceLastContact={daysSince(data.item.lastContact)}
-                    />
+                    <View style={styles.buddyContainer}>
+                        <TouchableOpacity
+                            onPress={() => toggleUserDetail(data.item)}
+                            activeOpacity={0.7}>
+                            <Buddy
+                                friend={data.item}
+                                daysSinceLastContact={daysSince(data.item.lastContact)}
+                                toggleUserDetail={toggleUserDetail}
+                            />
+                        </TouchableOpacity>
+                    </View>
+
                 )}
                 renderHiddenItem={renderHiddenItem}
                 leftOpenValue={75}
@@ -73,12 +79,18 @@ const BuddyList = ({ buddyData, onDeleteUser }) => {
 }
 
 const styles = StyleSheet.create({
+    buddyContainer: {
+        backgroundColor: 'black',
+        marginVertical: 10,
+        marginHorizontal: 10,
+        borderRadius: 15
+    },
     rowBack: {
         alignItems: 'center',
         flex: 1,
         flexDirection: 'row',
         justifyContent: 'space-between',
-        paddingLeft: 15,
+        paddingLeft: 15
     },
     backRightBtn: {
         alignItems: 'center',
@@ -96,7 +108,7 @@ const styles = StyleSheet.create({
     },
     backTextWhite: {
         color: '#FFF',
-    },
+    }
 });
 
 export default BuddyList;
