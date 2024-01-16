@@ -7,6 +7,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import * as FileSystem from 'expo-file-system';
 import 'react-native-get-random-values';
 import BuddyDetail from './BuddyDetail';
+import { formatDate } from '../utils/commonFunctions';
 
 const directoryPath = FileSystem.documentDirectory + 'bucketbuddydir';
 const filePath = directoryPath + '/buddy_data.json';
@@ -15,6 +16,7 @@ const Index = () => {
     const [visible, setVisible] = useState(false);
     const [userName, setUserName] = useState('');
     const [birthday, setBirthday] = useState(new Date());
+    const [birthdayPicked, setBirthdayPicked] = useState(false);
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [buddyData, setBuddyData] = useState(new Map());
 
@@ -27,12 +29,14 @@ const Index = () => {
         setUserName('');
         setBirthday(new Date());
         setVisible(false)
+        setBirthdayPicked(false)
     };
 
     const onDateChange = (event, selectedDate) => {
         const currentDate = selectedDate || birthday;
         setShowDatePicker(Platform.OS === 'ios');
         setBirthday(currentDate);
+        setBirthdayPicked(true)
     };
 
     const handleAddUser = async () => {
@@ -129,7 +133,7 @@ const Index = () => {
                         style={styles.input}
                     />
                     <Button onPress={() => setShowDatePicker(true)} icon="cake-variant" labelStyle={{ color: '#a15586' }}>
-                        Pick Birthday
+                        {birthdayPicked ? formatDate(birthday) : 'Pick Birthday'}
                     </Button>
                     {showDatePicker && (
                         <DateTimePicker
