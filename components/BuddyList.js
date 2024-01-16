@@ -3,13 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, BackHandler, TouchableWithout
 import { SwipeListView } from 'react-native-swipe-list-view';
 import Buddy from './Buddy';
 import { Icon } from 'react-native-paper';
-
-const daysSince = (date) => {
-    const today = new Date();
-    const lastContactDate = new Date(date);
-    const difference = today - lastContactDate;
-    return Math.floor(difference / (1000 * 60 * 60 * 24)); // Convert milliseconds to days
-}
+import { daysSince } from '../utils/commonFunctions';
 
 const BuddyList = ({ buddyData, onDeleteUser, toggleUserDetail }) => {
 

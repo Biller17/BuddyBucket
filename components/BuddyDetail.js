@@ -1,31 +1,17 @@
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Avatar, Modal, Text } from 'react-native-paper';
+import { formatDate, daysSince } from '../utils/commonFunctions';
 
 const BuddyDetail = ({ visible, onClose, buddy }) => {
     if (!buddy) {
         return null;
     }
 
-    const formatDate = (dateString) => {
-        const date = new Date(dateString);
-        const options = { month: 'long', day: 'numeric' };
-        return date.toLocaleDateString('en-US', options);
-    };
-
     const isBirthday = () => {
         const today = new Date();
         const birthday = new Date(buddy.birthday);
         return today.getDate() === birthday.getDate() &&
             today.getMonth() === birthday.getMonth();
-    };
-
-
-    const daysSince = (date) => {
-        console.log(date);
-        const today = new Date();
-        const lastContactDate = new Date(date);
-        const difference = today - lastContactDate;
-        return Math.floor(difference / (1000 * 60 * 60 * 24)); // Convert milliseconds to days
     };
 
     return (
