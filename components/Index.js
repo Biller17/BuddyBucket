@@ -34,7 +34,7 @@ const Index = () => {
 
     const onDateChange = (event, selectedDate) => {
         const currentDate = selectedDate || birthday;
-        setShowDatePicker(Platform.OS === 'ios');
+        setShowDatePicker(false);
         setBirthday(currentDate);
         setBirthdayPicked(true)
     };
