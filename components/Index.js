@@ -1,13 +1,13 @@
 import React, { useState, useTransition } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Platform, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import { Appbar, Modal, Portal, Button, TextInput, Text } from 'react-native-paper';
 import { v4 as uuidv4 } from 'uuid';
 import BuddyList from './BuddyList';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import * as FileSystem from 'expo-file-system';
-import 'react-native-get-random-values';
+import * as FileSystem from 'expo-file-system/legacy';
 import BuddyDetail from './BuddyDetail';
-import { formatDate } from '../utils/commonFunctions';
+import ContactFrequencyPicker, { DEFAULT_CONTACT_LIMIT } from './ContactFrequencyPicker';
+import BirthdayPicker, { MONTH_NAMES } from './BirthdayPicker';
+import { requestNotificationPermissions, scheduleBuddyReminder, cancelBuddyReminder, syncAllReminders } from '../utils/notifications';
 
 const directoryPath = FileSystem.documentDirectory + 'bucketbuddydir';
 const filePath = directoryPath + '/buddy_data.json';
@@ -15,9 +15,11 @@ const filePath = directoryPath + '/buddy_data.json';
 const Index = () => {
     const [visible, setVisible] = useState(false);
     const [userName, setUserName] = useState('');
-    const [birthday, setBirthday] = useState(new Date());
+    const [birthMonth, setBirthMonth] = useState(() => new Date().getMonth());
+    const [birthDay, setBirthDay] = useState(() => new Date().getDate());
     const [birthdayPicked, setBirthdayPicked] = useState(false);
     const [showDatePicker, setShowDatePicker] = useState(false);
+    const [contactLimit, setContactLimit] = useState(DEFAULT_CONTACT_LIMIT);
     const [buddyData, setBuddyData] = useState(new Map());
 
     const [selectedBuddy, setSelectedBuddy] = useState(null);
@@ -26,36 +28,47 @@ const Index = () => {
     const showModal = () => setVisible(true);
 
     const hideModal = () => {
+        const now = new Date();
         setUserName('');
-        setBirthday(new Date());
+        setBirthMonth(now.getMonth());
+        setBirthDay(now.getDate());
         setVisible(false)
         setBirthdayPicked(false)
+        setShowDatePicker(false)
+        setContactLimit(DEFAULT_CONTACT_LIMIT)
     };
 
-    const onDateChange = (event, selectedDate) => {
-        const currentDate = selectedDate || birthday;
-        setShowDatePicker(Platform.OS === 'ios');
-        setBirthday(currentDate);
-        setBirthdayPicked(true)
+    const onBirthdayChange = (month, day) => {
+        setBirthMonth(month);
+        setBirthDay(day);
+        setBirthdayPicked(true);
     };
 
     const handleAddUser = async () => {
-        if (userName == '') {
+        Keyboard.dismiss();
+        if (userName.trim() === '') {
             hideModal();
             return;
         }
         const userId = uuidv4();
         const newUser = {
             id: userId,
-            name: userName,
-            birthday: birthday.toISOString().split('T')[0],
+            name: userName.trim(),
+            // Stored with a fixed placeholder year — only month/day matter.
+            birthday: `2000-${String(birthMonth + 1).padStart(2, '0')}-${String(birthDay).padStart(2, '0')}`,
             lastContact: new Date().toISOString().split('T')[0],
-            contactLimit: 10
+            contactLimit: contactLimit
         };
-        data = buddyData;
-        data.set(userId, newUser);
-        setBuddyData(data);
-        await FileSystem.writeAsStringAsync(filePath, JSON.stringify(Array.from(buddyData.entries())));
+        // Build a new Map so React sees a new reference and re-renders the list.
+        const newBuddyData = new Map(buddyData);
+        newBuddyData.set(userId, newUser);
+        setBuddyData(newBuddyData);
+        try {
+            await FileSystem.writeAsStringAsync(filePath, JSON.stringify(Array.from(newBuddyData.entries())));
+        } catch (error) {
+            console.error('Failed to save buddy:', error);
+        }
+        scheduleBuddyReminder(newUser);
         hideModal();
     };
 
@@ -64,7 +77,45 @@ const Index = () => {
         const newBuddyData = new Map(buddyData);
         newBuddyData.delete(userId);
         setBuddyData(newBuddyData);
-        await FileSystem.writeAsStringAsync(filePath, JSON.stringify(newBuddyData));
+        await FileSystem.writeAsStringAsync(filePath, JSON.stringify(Array.from(newBuddyData.entries())));
+        cancelBuddyReminder(userId);
+    };
+
+    // Apply a partial update to one buddy and persist, keeping the Map
+    // immutable so the list re-renders.
+    const updateBuddy = async (userId, changes) => {
+        const existing = buddyData.get(userId);
+        if (!existing) return;
+        const updated = { ...existing, ...changes };
+        const newBuddyData = new Map(buddyData);
+        newBuddyData.set(userId, updated);
+        setBuddyData(newBuddyData);
+        try {
+            await FileSystem.writeAsStringAsync(filePath, JSON.stringify(Array.from(newBuddyData.entries())));
+        } catch (error) {
+            console.error('Failed to update buddy:', error);
+        }
+        // Re-schedule this buddy's reminder for its new due date.
+        scheduleBuddyReminder(updated);
+    };
+
+    // Check-In: mark contact as of today (resets days-since) and clear any snooze.
+    const handleCheckIn = (userId) => {
+        updateBuddy(userId, {
+            lastContact: new Date().toISOString().split('T')[0],
+            snoozedUntil: null,
+        });
+    };
+
+    // Snooze: quiet the overdue reminder for a few days without recording contact.
+    const handleSnooze = (userId) => {
+        const until = new Date();
+        until.setDate(until.getDate() + 3);
+        updateBuddy(userId, { snoozedUntil: until.toISOString().split('T')[0] });
+    };
+
+    const handleUpdateContactLimit = (userId, newLimit) => {
+        updateBuddy(userId, { contactLimit: newLimit });
     };
 
     const toggleUserDetail = (buddy) => {
@@ -88,12 +139,14 @@ const Index = () => {
                     await FileSystem.writeAsStringAsync(filePath, JSON.stringify(buddyData));
                 } else {
                     FileSystem.readAsStringAsync(filePath)
-                        .then(contents => {
-                            if (contents === '{}') {
-                                setBuddyData(new Map());
-                            } else {
-                                let data = new Map(JSON.parse(contents));
-                                setBuddyData(data);
+                        .then(async contents => {
+                            const data = contents === '{}' ? new Map() : new Map(JSON.parse(contents));
+                            setBuddyData(data);
+                            // Ask once for permission, then (re)build all reminders
+                            // from the freshly loaded data.
+                            const granted = await requestNotificationPermissions();
+                            if (granted) {
+                                syncAllReminders(data);
                             }
                         })
                         .catch(error => console.log('File reading error:', error));
@@ -122,39 +175,57 @@ const Index = () => {
                     onPress={showModal}
                 />
             </Appbar.Header>
-            <BuddyList buddyData={buddyData} onDeleteUser={handleDeleteUser} toggleUserDetail={toggleUserDetail} />
+            <BuddyList buddyData={buddyData} onDeleteUser={handleDeleteUser} toggleUserDetail={toggleUserDetail} onCheckIn={handleCheckIn} onSnooze={handleSnooze} />
             <Portal>
                 <Modal visible={visible} onDismiss={hideModal} contentContainerStyle={styles.modalContainer}>
-                    <Text style={styles.modalTitle}>Add Buddy</Text>
-                    <TextInput
-                        label="Name"
-                        value={userName}
-                        onChangeText={setUserName}
-                        style={styles.input}
-                    />
-                    <Button onPress={() => setShowDatePicker(true)} icon="cake-variant" labelStyle={{ color: '#a15586' }}>
-                        {birthdayPicked ? formatDate(birthday) : 'Pick Birthday'}
-                    </Button>
-                    {showDatePicker && (
-                        <DateTimePicker
-                            value={birthday}
-                            mode="date"
-                            onChange={onDateChange}
-                        />
-                    )}
-                    <View style={styles.buttonContainer}>
-                        <Button mode="outlined" onPress={hideModal} style={styles.button} labelStyle={{ color: 'gray' }}>
-                            Close
-                        </Button>
-                        <Button mode="contained" onPress={handleAddUser} style={styles.addButton}>
-                            Add
-                        </Button>
-                    </View>
+                    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+                        <View>
+                            <Text style={styles.modalTitle}>Add Buddy</Text>
+                            <TextInput
+                                label="Name"
+                                value={userName}
+                                onChangeText={setUserName}
+                                style={styles.input}
+                                returnKeyType="done"
+                                onSubmitEditing={Keyboard.dismiss}
+                                blurOnSubmit
+                            />
+                            <Button onPress={() => { Keyboard.dismiss(); setShowDatePicker((s) => !s); }} icon="cake-variant" labelStyle={{ color: '#a15586' }}>
+                                {birthdayPicked ? `${MONTH_NAMES[birthMonth]} ${birthDay}` : 'Pick Birthday'}
+                            </Button>
+                            {showDatePicker && (
+                                <View>
+                                    <BirthdayPicker
+                                        month={birthMonth}
+                                        day={birthDay}
+                                        onChange={onBirthdayChange}
+                                    />
+                                    <Button onPress={() => setShowDatePicker(false)} labelStyle={{ color: '#a15586' }}>
+                                        Done
+                                    </Button>
+                                </View>
+                            )}
+                            <ContactFrequencyPicker
+                                value={contactLimit}
+                                onChange={setContactLimit}
+                                labelPrefix="I want to check on my buddy every"
+                            />
+                            <View style={styles.buttonContainer}>
+                                <Button mode="outlined" onPress={hideModal} style={styles.button} labelStyle={{ color: 'gray' }}>
+                                    Close
+                                </Button>
+                                <Button mode="contained" onPress={handleAddUser} style={styles.addButton}>
+                                    Add
+                                </Button>
+                            </View>
+                        </View>
+                    </TouchableWithoutFeedback>
                 </Modal>
                 <BuddyDetail
                     visible={userDetailVisible}
                     onClose={() => setUserDetailVisible(false)}
                     buddy={selectedBuddy}
+                    onUpdateContactLimit={handleUpdateContactLimit}
                 />
             </Portal>
         </View>

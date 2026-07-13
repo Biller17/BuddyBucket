@@ -1,22 +1,13 @@
 import { View, StyleSheet } from 'react-native';
 import { Avatar, Button, Card, Text } from 'react-native-paper';
+import { formatDate } from '../utils/commonFunctions';
 
 let today = new Date();
 
-const formatDate = (date) => {
-    let d = new Date(date);
-    let month = '' + (d.getMonth() + 1);
-    let day = '' + d.getDate();
+const Buddy = ({ friend, daysSinceLastContact, onCheckIn, onSnooze }) => {
+    const isOverdue = daysSinceLastContact > friend.contactLimit;
+    const isSnoozed = friend.snoozedUntil != null && new Date(friend.snoozedUntil) > new Date();
 
-    if (month.length < 2)
-        month = '0' + month;
-    if (day.length < 2)
-        day = '0' + day;
-
-    return [month, day].join('-');
-}
-
-const Buddy = ({ friend, daysSinceLastContact }) => {
     return (
         <Card style={styles.buddyStyle}>
             <Card.Content>
@@ -28,9 +19,10 @@ const Buddy = ({ friend, daysSinceLastContact }) => {
                 </View>
             </Card.Content>
             <Card.Actions>
-                {daysSinceLastContact > friend.contactLimit &&
-                    (<Button buttonColor="#a15586" icon="sleep" labelStyle={{ color: 'white' }}>Snooze</Button>)}
-                <Button buttonColor="#e67aa7" icon="check-circle-outline" labelStyle={{ color: 'white' }}>Check-In</Button>
+                {isOverdue && !isSnoozed && (
+                    <Button buttonColor="#a15586" icon="sleep" labelStyle={{ color: 'white' }} onPress={() => onSnooze(friend.id)}>Snooze</Button>
+                )}
+                <Button buttonColor="#e67aa7" icon="check-circle-outline" labelStyle={{ color: 'white' }} onPress={() => onCheckIn(friend.id)}>Check-In</Button>
             </Card.Actions>
             <View style={styles.daysSinceContainer}>
                 <Text style={styles.daysSinceText}>{daysSinceLastContact} days</Text>

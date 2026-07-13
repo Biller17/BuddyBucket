@@ -1,17 +1,34 @@
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Avatar, Modal, Text } from 'react-native-paper';
 import { formatDate, daysSince } from '../utils/commonFunctions';
+import ContactFrequencyPicker from './ContactFrequencyPicker';
 
-const BuddyDetail = ({ visible, onClose, buddy }) => {
+const BuddyDetail = ({ visible, onClose, buddy, onUpdateContactLimit }) => {
+    const [contactLimit, setContactLimit] = useState(7);
+
+    // Keep the editable value in sync with whichever buddy is being shown.
+    useEffect(() => {
+        if (buddy) {
+            setContactLimit(buddy.contactLimit);
+        }
+    }, [buddy]);
+
     if (!buddy) {
         return null;
     }
 
+    const handleLimitChange = (value) => {
+        setContactLimit(value);
+        onUpdateContactLimit(buddy.id, value);
+    };
+
     const isBirthday = () => {
         const today = new Date();
-        const birthday = new Date(buddy.birthday);
-        return today.getDate() === birthday.getDate() &&
-            today.getMonth() === birthday.getMonth();
+        // birthday is stored as YYYY-MM-DD; compare month/day directly to avoid
+        // any timezone shifting from Date parsing.
+        const [, month, day] = buddy.birthday.split('-').map(Number);
+        return today.getMonth() + 1 === month && today.getDate() === day;
     };
 
     return (
@@ -34,8 +51,12 @@ const BuddyDetail = ({ visible, onClose, buddy }) => {
                 <View style={styles.daysSinceContainer}>
                     <Text style={styles.daysSinceText}>{daysSince(buddy.lastContact)} days ago</Text>
                 </View>
-                <Text style={styles.contentTitle}>Contact Limit</Text>
-                <Text>{buddy.contactLimit} days</Text>
+                <Text style={styles.contentTitle}>Check-in Frequency</Text>
+                <ContactFrequencyPicker
+                    value={contactLimit}
+                    onChange={handleLimitChange}
+                    labelPrefix="Check in every"
+                />
 
                 <TouchableOpacity
                     style={styles.closeButton}

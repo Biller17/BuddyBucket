@@ -1,5 +1,9 @@
 export const formatDate = (dateString) => {
-    const date = new Date(dateString);
+    // Parse a bare YYYY-MM-DD as local midnight; otherwise `new Date` treats it
+    // as UTC and can render the wrong day in negative-offset timezones.
+    const date = typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateString)
+        ? new Date(`${dateString}T00:00:00`)
+        : new Date(dateString);
     const options = { month: 'long', day: 'numeric' };
     return date.toLocaleDateString('en-US', options);
 };

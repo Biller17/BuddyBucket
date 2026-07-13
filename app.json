@@ -31,6 +31,9 @@
       "eas": {
         "projectId": "e246d48b-6cb5-4423-b090-df32c1799e56"
       }
-    }
+    },
+    "plugins": [
+      "expo-notifications"
+    ]
   }
 }
